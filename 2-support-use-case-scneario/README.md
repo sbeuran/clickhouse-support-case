@@ -4,73 +4,77 @@
 This folder contains a complete analysis and reproduction of a ClickHouse row policy issue where users cannot properly filter system.tables based on database name.
 
 ## Repository Structure
-.
-.
-├── README.md
-├── problem
+```
+2-support-use-case-scenario/
+├── problem/
 │   ├── run_query.sh
 │   ├── setup.sh
-│   └── sql
+│   └── sql/
 │       ├── 01_create_tables.sql
 │       ├── 02_insert_data.sql
 │       └── 03_create_analytics_db.sql
-└── solution
+└── solution/
     ├── run_query.sh
     ├── setup.sh
-    └── sql
+    └── sql/
         ├── 01_create_tables.sql
         ├── 02_insert_data.sql
         └── 03_create_analytics_db.sql
+```
 
 ## Quick Start
-1. To reproduce the issue:
-   \`\`\`bash
-   cd problem
-   ./setup.sh
-   ./run_query.sh
-   \`\`\`
-2. To see the working solution:
-   \`\`\`bash
-   cd solution
-   ./setup.sh
-   ./run_query.sh
-   \`\`\`
+```bash
+# To reproduce the issue:
+cd problem
+./setup.sh
+./run_query.sh
+
+# To see the working solution:
+cd solution
+./setup.sh
+./run_query.sh
+```
 
 ## 1. Customer Issue
 Customer reported that neither the default user nor user_analytics can see any rows when querying system.tables, despite setting up a row policy intended to show only analytics-related tables.
 
 ### Initial Setup
-\`\`\`sql
+```sql
 CREATE DATABASE analytics;
 
-CREATE TABLE analytics.test
-(
+CREATE TABLE analytics.test (
     "name" String,
     "id" UInt32
-)
-ENGINE = MergeTree()
+) ENGINE = MergeTree()
 ORDER BY (id);
 
 CREATE ROLE role_analytics 
-SETTINGS log_profile_events = 1 READONLY, 
-         log_queries = 1 READONLY, 
-         log_query_settings = 1 READONLY, 
-         log_query_threads = 1 READONLY;
+SETTINGS 
+    log_profile_events = 1 READONLY, 
+    log_queries = 1 READONLY, 
+    log_query_settings = 1 READONLY, 
+    log_query_threads = 1 READONLY;
 
-CREATE USER user_analytics IDENTIFIED WITH plaintext_password BY 'password' 
+CREATE USER user_analytics 
+IDENTIFIED WITH plaintext_password BY 'password' 
 DEFAULT ROLE role_analytics;
 
 CREATE ROW POLICY user_analytics_filter ON system.tables 
-FOR SELECT USING database = 'analytics' TO user_analytics;
-\`\`\`
+FOR SELECT USING database = 'analytics' 
+TO user_analytics;
+```
 
 ### Problem Query
-\`\`\`sql
-SELECT engine, name, database, total_rows 
+```sql
+SELECT 
+    engine, 
+    name, 
+    database, 
+    total_rows 
 FROM system.tables 
 WHERE engine = 'MergeTree'
-LIMIT 10
-\`\`\`
+LIMIT 10;
+```
 
 ## 2. Investigation Steps
 
@@ -157,8 +161,6 @@ FOR SELECT USING database ILIKE '%analytics%' TO user_analytics;
    - Verified default user access remains unchanged
    - Checked system tables accessibility
 
-
-
 ## 6. Customer Response
 
 Dear Customer,
@@ -207,7 +209,7 @@ Best regards,
 ## 7. Reproduction Code
 
 ### Problem Setup (problem/sql/03_create_analytics_db.sql)
-\`\`\`sql
+```sql
 CREATE DATABASE IF NOT EXISTS analytics;
 
 CREATE TABLE analytics.test
@@ -230,10 +232,10 @@ DEFAULT ROLE role_analytics;
 
 CREATE ROW POLICY user_analytics_filter ON system.tables 
 FOR SELECT USING database = 'analytics' TO user_analytics;
-\`\`\`
+```
 
 ### Solution Setup (solution/sql/03_create_analytics_db.sql)
-\`\`\`sql
+```sql
 CREATE DATABASE IF NOT EXISTS analytics;
 
 CREATE TABLE analytics.test
@@ -256,4 +258,4 @@ DEFAULT ROLE role_analytics;
 
 CREATE ROW POLICY user_analytics_filter ON system.tables
 FOR SELECT USING database ILIKE '%analytics%' TO user_analytics;
-\`\`\`
+```
